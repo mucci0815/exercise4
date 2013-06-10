@@ -26,7 +26,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name="org.teleal.cling.android.AndroidUpnpServiceImpl"></service>
+        <service android:name=".helper.MyUpnpServiceImpl"></service>
     </application>
 
 </manifest>
