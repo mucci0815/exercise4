@@ -30,7 +30,7 @@ public class MyUpnpServiceImpl extends AndroidUpnpServiceImpl {
 			@Override
 			public ServiceType[] getExclusiveServiceTypes() {
 				return new ServiceType[] {
-						new UDAServiceType("MediaRenderer")		// we only want to display MediaRenderer
+						new UDAServiceType("AVTransport")		// we only want to display AVTransport services
 				};
 			}
 			

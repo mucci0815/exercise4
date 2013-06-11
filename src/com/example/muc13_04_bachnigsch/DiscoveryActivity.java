@@ -1,14 +1,16 @@
 package com.example.muc13_04_bachnigsch;
 
 import org.teleal.cling.android.AndroidUpnpService;
+import org.teleal.cling.android.AndroidUpnpServiceImpl;
 import org.teleal.cling.model.meta.Device;
 import org.teleal.cling.model.meta.LocalDevice;
 import org.teleal.cling.model.meta.RemoteDevice;
 import org.teleal.cling.registry.DefaultRegistryListener;
 import org.teleal.cling.registry.Registry;
-import org.teleal.cling.registry.RegistryListener;
 
-import android.R;
+import com.example.muc13_04_bachnigsch.helper.AppData;
+import com.example.muc13_04_bachnigsch.helper.MyUpnpServiceImpl;
+
 import android.app.ListActivity;
 import android.content.ComponentName;
 import android.content.Context;
@@ -17,12 +19,13 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v4.app.NavUtils;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.ListView;
 import android.widget.Toast;
-
-import com.example.muc13_04_bachnigsch.helper.MyUpnpServiceImpl;
 
 public class DiscoveryActivity extends ListActivity {
 
@@ -81,6 +84,34 @@ public class DiscoveryActivity extends ListActivity {
 		}
 
 		getApplicationContext().unbindService(mServiceConnection);
+	}
+
+	@Override
+	protected void onPause() {
+		super.onPause();
+		
+		// pause UPnP service's registry
+		if(null != mUpnpService)
+			mUpnpService.getRegistry().pause();
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		
+		// resume UPnP service's registry
+		if(null != mUpnpService && mUpnpService.getRegistry().isPaused())
+			mUpnpService.getRegistry().resume();
+	}
+
+	@Override
+	protected void onListItemClick(ListView l, View v, int position, long id) {
+		if(BuildConfig.DEBUG)
+			Log.d(TAG, "Clicked: "+mListAdapter.getItem(position).toString());
+		
+		// start new ControlActivity and pass device
+		AppData.getInstance().setCurrentDevice(mListAdapter.getItem(position).getDevice());
+		startActivity(new Intent(this, ControlActivity.class));
 	}
 
 	/**

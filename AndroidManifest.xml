@@ -28,7 +28,7 @@
             </intent-filter>
         </activity>
 
-        <service android:name="com.example.muc13_04_bachnigsch.helper.MyUpnpServiceImpl" >
+        <service android:name=".helper.MyUpnpServiceImpl" >
         </service>
 
         <activity
@@ -38,6 +38,14 @@
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.example.muc13_02_bachnigsch.MainActivity" />
+        </activity>
+        <activity
+            android:name="com.example.muc13_04_bachnigsch.ControlActivity"
+            android:label="@string/title_activity_control"
+            android:parentActivityName="com.example.muc13_04_bachnigsch.DiscoveryActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.example.muc13_04_bachnigsch.DiscoveryActivity" />
         </activity>
     </application>
 
