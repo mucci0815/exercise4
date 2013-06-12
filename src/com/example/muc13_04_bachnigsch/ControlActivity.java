@@ -1,14 +1,27 @@
 package com.example.muc13_04_bachnigsch;
 
+import java.util.List;
+
 import org.teleal.cling.android.AndroidUpnpService;
 import org.teleal.cling.controlpoint.ActionCallback;
+import org.teleal.cling.controlpoint.SubscriptionCallback;
 import org.teleal.cling.model.action.ActionInvocation;
+import org.teleal.cling.model.gena.CancelReason;
+import org.teleal.cling.model.gena.GENASubscription;
 import org.teleal.cling.model.message.UpnpResponse;
 import org.teleal.cling.model.meta.Device;
 import org.teleal.cling.model.meta.Service;
 import org.teleal.cling.model.types.UDAServiceType;
 import org.teleal.cling.support.avtransport.callback.Play;
 import org.teleal.cling.support.avtransport.callback.Stop;
+import org.teleal.cling.support.avtransport.lastchange.AVTransportLastChangeParser;
+import org.teleal.cling.support.avtransport.lastchange.AVTransportVariable;
+import org.teleal.cling.support.avtransport.lastchange.AVTransportVariable.CurrentTrackMetaData;
+import org.teleal.cling.support.contentdirectory.DIDLParser;
+import org.teleal.cling.support.lastchange.LastChange;
+import org.teleal.cling.support.model.DIDLContent;
+import org.teleal.cling.support.model.item.Item;
+import org.teleal.cling.support.model.item.MusicTrack;
 
 import android.app.Activity;
 import android.content.ComponentName;
@@ -22,6 +35,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.TextView;
 
 import com.example.muc13_04_bachnigsch.callback.Next;
 import com.example.muc13_04_bachnigsch.callback.Previous;
@@ -34,6 +48,7 @@ public class ControlActivity extends Activity {
 	private Device mDevice = null;
 	private AndroidUpnpService mUpnpService;
 	private Service mAVService = null;
+	private SubscriptionCallback mSubscriptionCallback;
 	private ServiceConnection mServiceConnection = new ServiceConnection() {
 
 		@Override
@@ -46,8 +61,15 @@ public class ControlActivity extends Activity {
 		public void onServiceConnected(ComponentName name, IBinder service) {
 			mUpnpService = (AndroidUpnpService) service; // get service binder
 
+			if(null != mSubscriptionCallback)
+				mUpnpService.getControlPoint().execute(mSubscriptionCallback);
 		}
 	};
+	
+	private TextView mTitleText;
+	private TextView mArtistText;
+	private TextView mAlbumText;
+	private MusicTrack mCurrentTrack = null;		// holds current Track
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +77,11 @@ public class ControlActivity extends Activity {
 		setContentView(R.layout.activity_control);
 		// Show the Up button in the action bar.
 		setupActionBar();
+		
+		// find TextViews
+		mTitleText = (TextView) findViewById(R.id.titleText);
+		mArtistText = (TextView) findViewById(R.id.artistText);
+		mAlbumText = (TextView) findViewById(R.id.albumText);		
 
 		// get selected device
 		mDevice = AppData.getInstance().getCurrentDevice();
@@ -70,6 +97,74 @@ public class ControlActivity extends Activity {
 
 		// get AVTransportService
 		mAVService = mDevice.findService(new UDAServiceType("AVTransport"));
+		
+		// listen for changes
+		mSubscriptionCallback = new SubscriptionCallback(mAVService, 600) {
+			
+			@Override
+			protected void failed(GENASubscription arg0, UpnpResponse arg1,
+					Exception arg2, String arg3) {
+				Log.e(TAG, createDefaultFailureMessage(arg1, arg2));
+				
+			}
+			
+			@Override
+			protected void eventsMissed(GENASubscription arg0, int arg1) {
+				Log.i(TAG, "Missed events: "+arg1);
+				
+			}
+			
+			@Override
+			protected void eventReceived(GENASubscription arg0) {
+				Log.i(TAG, "Event: " + arg0.getCurrentSequence().getValue());
+				
+				try {
+					LastChange lastChange = new LastChange(new AVTransportLastChangeParser(), arg0.getCurrentValues().get("LastChange").toString());
+					updateStatus(lastChange);
+				} catch (Exception e) {
+					e.printStackTrace();
+					Log.e(TAG, "Error parsing LastChange");
+				}
+				
+			}
+			
+			@Override
+			protected void established(GENASubscription arg0) {
+				Log.i(TAG, "Established: "+arg0.getSubscriptionId());
+				
+			}
+			
+			@Override
+			protected void ended(GENASubscription arg0, CancelReason arg1,
+					UpnpResponse arg2) {
+								
+			}
+		};		
+	}
+	
+	private void updateStatus(LastChange lastChange) {
+		
+		CurrentTrackMetaData currentTrack = lastChange.getEventedValue(0, AVTransportVariable.CurrentTrackMetaData.class);
+		if(null != currentTrack) {
+			DIDLParser dParser = new DIDLParser();
+			try {
+				DIDLContent dContent = dParser.parse(currentTrack.getValue());
+				List<Item> blubb = dContent.getItems();
+				MusicTrack mt = new MusicTrack(blubb.get(0));
+				mCurrentTrack = mt;
+				Log.i(TAG, "CurrentTrack: "+mt.getTitle()+" "+mt.getAlbum()+" "+mt.getFirstArtist().getName());
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		AVTransportVariable.TransportState transportState = lastChange.getEventedValue(0, AVTransportVariable.TransportState.class);
+		if(null != transportState) {
+			Log.i(TAG, "TransportState: "+transportState.getValue().getValue());
+		}
+		
+		updateView();
 	}
 
 	/**
@@ -103,6 +198,20 @@ public class ControlActivity extends Activity {
 			return true;
 		}
 		return super.onOptionsItemSelected(item);
+	}
+	
+	private void updateView() {
+		if(null != mCurrentTrack) {
+			runOnUiThread(new Runnable() {
+				
+				@Override
+				public void run() {
+					mTitleText.setText(mCurrentTrack.getTitle());
+					mArtistText.setText(mCurrentTrack.getFirstArtist().getName());
+					mAlbumText.setText(mCurrentTrack.getAlbum());					
+				}
+			});
+		}
 	}
 
 	/**
@@ -153,12 +262,12 @@ public class ControlActivity extends Activity {
 		}
 	}
 
-	/**
+/**
 	 * gets called when user presses "<<" Button
 	 */
 	public void onPrevious(View view) {
 		if (BuildConfig.DEBUG)
-			Log.d(TAG, "Stop");
+			Log.d(TAG, "Previous");
 
 		ActionCallback previousAction = new Previous(mAVService) {
 
@@ -173,13 +282,13 @@ public class ControlActivity extends Activity {
 
 		mUpnpService.getControlPoint().execute(previousAction);
 	}
-	
+
 	/**
 	 * gets called when user presses ">>" Button
 	 */
 	public void onNext(View view) {
 		if (BuildConfig.DEBUG)
-			Log.d(TAG, "Stop");
+			Log.d(TAG, "Next");
 
 		ActionCallback nextAction = new Next(mAVService) {
 
