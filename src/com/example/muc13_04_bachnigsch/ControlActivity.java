@@ -1,5 +1,8 @@
 package com.example.muc13_04_bachnigsch;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 
 import org.teleal.cling.android.AndroidUpnpService;
@@ -70,6 +73,7 @@ public class ControlActivity extends Activity {
 	private TextView mArtistText;
 	private TextView mAlbumText;
 	private MusicTrack mCurrentTrack = null;		// holds current Track
+	private Date mCurrentDUration = null;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -144,24 +148,40 @@ public class ControlActivity extends Activity {
 	
 	private void updateStatus(LastChange lastChange) {
 		
+		// extract TrackMetaData
 		CurrentTrackMetaData currentTrack = lastChange.getEventedValue(0, AVTransportVariable.CurrentTrackMetaData.class);
 		if(null != currentTrack) {
 			DIDLParser dParser = new DIDLParser();
 			try {
+				Log.i(TAG,currentTrack.getValue());
 				DIDLContent dContent = dParser.parse(currentTrack.getValue());
 				List<Item> blubb = dContent.getItems();
 				MusicTrack mt = new MusicTrack(blubb.get(0));
 				mCurrentTrack = mt;
-				Log.i(TAG, "CurrentTrack: "+mt.getTitle()+" "+mt.getAlbum()+" "+mt.getFirstArtist().getName());
+				if(null != mt.getFirstArtist())
+					Log.i(TAG, "CurrentTrack: "+mt.getTitle()+" "+mt.getAlbum()+" "+mt.getFirstArtist().getName());
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
 		
+		// extract TransportState
 		AVTransportVariable.TransportState transportState = lastChange.getEventedValue(0, AVTransportVariable.TransportState.class);
 		if(null != transportState) {
 			Log.i(TAG, "TransportState: "+transportState.getValue().getValue());
+		}
+		
+		// extract duration of Track
+		AVTransportVariable.CurrentTrackDuration currentDuration = lastChange.getEventedValue(0, AVTransportVariable.CurrentTrackDuration.class);
+		if(null != currentDuration) {
+			try {
+				mCurrentDUration = new SimpleDateFormat("HH:mm:ss").parse(currentDuration.getValue());
+				Log.i(TAG, "CurrentDuration: "+new SimpleDateFormat("mm:ss").format(mCurrentDUration));
+			} catch (ParseException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 		
 		updateView();
@@ -201,13 +221,14 @@ public class ControlActivity extends Activity {
 	}
 	
 	private void updateView() {
-		if(null != mCurrentTrack) {
+		if(null != mCurrentTrack && null != mCurrentDUration) {
 			runOnUiThread(new Runnable() {
 				
 				@Override
 				public void run() {
-					mTitleText.setText(mCurrentTrack.getTitle());
-					mArtistText.setText(mCurrentTrack.getFirstArtist().getName());
+					mTitleText.setText(mCurrentTrack.getTitle()+" ("+new SimpleDateFormat("m:ss").format(mCurrentDUration)+")");
+					if(null != mCurrentTrack.getFirstArtist())
+						mArtistText.setText(mCurrentTrack.getFirstArtist().getName());
 					mAlbumText.setText(mCurrentTrack.getAlbum());					
 				}
 			});
