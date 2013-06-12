@@ -8,18 +8,10 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".ControlActivity" >
 
-    <TextView
-        android:id="@+id/textView1"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/hello_world" />
-
     <Button
         android:id="@+id/playButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/textView1"
-        android:layout_below="@+id/textView1"
         android:layout_marginLeft="44dp"
         android:layout_marginTop="64dp"
         android:onClick="onPlay"
@@ -54,5 +46,44 @@
         android:layout_alignLeft="@+id/stopButton"
         android:onClick="onNext"
         android:text="@string/next" />
+
+    <TextView
+        android:id="@+id/textView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/stopButton"
+        android:layout_marginBottom="22dp"
+        android:text="Remote Control"
+        android:textAppearance="?android:attr/textAppearanceLarge" />
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/previousButton"
+        android:layout_marginTop="46dp"
+        android:layout_toLeftOf="@+id/nextButton"
+        android:text="Volume"
+        android:textAppearance="?android:attr/textAppearanceLarge" />
+
+    <Button
+        android:id="@+id/button1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/previousButton"
+        android:layout_below="@+id/textView2"
+        android:layout_marginTop="19dp"
+        android:onClick="onPlus"
+        android:text="+" />
+
+    <Button
+        android:id="@+id/button2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/button1"
+        android:layout_alignBottom="@+id/button1"
+        android:layout_alignLeft="@+id/nextButton"
+        android:onClick="onMinus"
+        android:text="-" />
 
 </RelativeLayout>

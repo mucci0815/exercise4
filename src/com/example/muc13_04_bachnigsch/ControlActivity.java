@@ -2,13 +2,17 @@ package com.example.muc13_04_bachnigsch;
 
 import org.teleal.cling.android.AndroidUpnpService;
 import org.teleal.cling.controlpoint.ActionCallback;
+import org.teleal.cling.model.action.ActionException;
 import org.teleal.cling.model.action.ActionInvocation;
 import org.teleal.cling.model.message.UpnpResponse;
 import org.teleal.cling.model.meta.Device;
 import org.teleal.cling.model.meta.Service;
+import org.teleal.cling.model.types.ErrorCode;
 import org.teleal.cling.model.types.UDAServiceType;
 import org.teleal.cling.support.avtransport.callback.Play;
 import org.teleal.cling.support.avtransport.callback.Stop;
+import org.teleal.cling.support.renderingcontrol.callback.GetVolume;
+import org.teleal.cling.support.renderingcontrol.callback.SetVolume;
 
 import android.app.Activity;
 import android.content.ComponentName;
@@ -34,12 +38,15 @@ public class ControlActivity extends Activity {
 	private Device mDevice = null;
 	private AndroidUpnpService mUpnpService;
 	private Service mAVService = null;
+	private Service rcService = null;
+	private int volume;
+	
+	
 	private ServiceConnection mServiceConnection = new ServiceConnection() {
-
+	
 		@Override
 		public void onServiceDisconnected(ComponentName name) {
 			Log.e(TAG, "Service disconnected");
-
 		}
 
 		@Override
@@ -70,6 +77,8 @@ public class ControlActivity extends Activity {
 
 		// get AVTransportService
 		mAVService = mDevice.findService(new UDAServiceType("AVTransport"));
+		// get RenderingControlService
+		rcService = mDevice.findService(new UDAServiceType("RenderingControl"));
 	}
 
 	/**
@@ -193,6 +202,83 @@ public class ControlActivity extends Activity {
 		};
 
 		mUpnpService.getControlPoint().execute(nextAction);
+	}
+	
+	
+	
+	/**
+	 * gets called when user presses "Plus" Button
+	 */
+	public void onPlus(View view) {
+		
+		if (BuildConfig.DEBUG)
+			Log.d(TAG, "Plus");
+		if (rcService != null) {
+
+			// Get Volume out of RenderingControlService
+			ActionCallback volumeAction = new GetVolume(rcService){
+				@Override
+				public void received(ActionInvocation actioonInvocation, int receivedVolume) {
+					//System.out.println("Aktuelle Lautstaerke: " + receivedVolume);
+					volume = receivedVolume;
+				}
+
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());	
+				}
+	
+			};
+			
+			mUpnpService.getControlPoint().execute(volumeAction);
+			
+			ActionCallback plusAction = new SetVolume(rcService, (long)volume + 5) {
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());	
+				}
+			};
+			mUpnpService.getControlPoint().execute(plusAction);
+		}
+	}
+	
+	
+	
+	public void onMinus(View view) {
+		
+		if (BuildConfig.DEBUG)
+			Log.d(TAG, "Minus");
+		if (rcService != null) {
+
+			// Get Volume out of RenderingControlService
+			ActionCallback volumeAction = new GetVolume(rcService){
+				@Override
+				public void received(ActionInvocation actioonInvocation, int receivedVolume) {
+					//System.out.println("Aktuelle Lautstaerke: " + receivedVolume);
+					volume = receivedVolume;
+				}
+
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());	
+				}
+	
+			};
+			
+			mUpnpService.getControlPoint().execute(volumeAction);
+			
+			ActionCallback minusAction = new SetVolume(rcService, (long)volume - 5) {
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());	
+				}
+			};
+			mUpnpService.getControlPoint().execute(minusAction);
+		}
 	}
 
 }
