@@ -15,6 +15,7 @@ import org.teleal.cling.model.message.UpnpResponse;
 import org.teleal.cling.model.meta.Device;
 import org.teleal.cling.model.meta.Service;
 import org.teleal.cling.model.types.UDAServiceType;
+import org.teleal.cling.support.avtransport.callback.Pause;
 import org.teleal.cling.support.avtransport.callback.Play;
 import org.teleal.cling.support.avtransport.callback.Stop;
 import org.teleal.cling.support.avtransport.lastchange.AVTransportLastChangeParser;
@@ -23,6 +24,7 @@ import org.teleal.cling.support.avtransport.lastchange.AVTransportVariable.Curre
 import org.teleal.cling.support.contentdirectory.DIDLParser;
 import org.teleal.cling.support.lastchange.LastChange;
 import org.teleal.cling.support.model.DIDLContent;
+import org.teleal.cling.support.model.TransportState;
 import org.teleal.cling.support.model.item.Item;
 import org.teleal.cling.support.model.item.MusicTrack;
 
@@ -38,6 +40,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.example.muc13_04_bachnigsch.callback.Next;
@@ -64,16 +67,19 @@ public class ControlActivity extends Activity {
 		public void onServiceConnected(ComponentName name, IBinder service) {
 			mUpnpService = (AndroidUpnpService) service; // get service binder
 
-			if(null != mSubscriptionCallback)
+			if (null != mSubscriptionCallback)
 				mUpnpService.getControlPoint().execute(mSubscriptionCallback);
 		}
 	};
-	
+
 	private TextView mTitleText;
 	private TextView mArtistText;
 	private TextView mAlbumText;
-	private MusicTrack mCurrentTrack = null;		// holds current Track
+	private Button mPlayButton;
+	private Button mStopButton;
+	private MusicTrack mCurrentTrack = null; // holds current Track
 	private Date mCurrentDUration = null;
+	private TransportState mCurrentTransportState = null;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -81,11 +87,14 @@ public class ControlActivity extends Activity {
 		setContentView(R.layout.activity_control);
 		// Show the Up button in the action bar.
 		setupActionBar();
-		
+
 		// find TextViews
 		mTitleText = (TextView) findViewById(R.id.titleText);
 		mArtistText = (TextView) findViewById(R.id.artistText);
-		mAlbumText = (TextView) findViewById(R.id.albumText);		
+		mAlbumText = (TextView) findViewById(R.id.albumText);
+		// find buttons
+		mPlayButton = (Button) findViewById(R.id.playButton);
+		mStopButton = (Button) findViewById(R.id.stopButton);
 
 		// get selected device
 		mDevice = AppData.getInstance().getCurrentDevice();
@@ -101,90 +110,114 @@ public class ControlActivity extends Activity {
 
 		// get AVTransportService
 		mAVService = mDevice.findService(new UDAServiceType("AVTransport"));
-		
+
 		// listen for changes
 		mSubscriptionCallback = new SubscriptionCallback(mAVService, 600) {
-			
+
 			@Override
 			protected void failed(GENASubscription arg0, UpnpResponse arg1,
 					Exception arg2, String arg3) {
 				Log.e(TAG, createDefaultFailureMessage(arg1, arg2));
-				
+
 			}
-			
+
 			@Override
 			protected void eventsMissed(GENASubscription arg0, int arg1) {
-				Log.i(TAG, "Missed events: "+arg1);
-				
+				Log.i(TAG, "Missed events: " + arg1);
+
 			}
-			
+
 			@Override
 			protected void eventReceived(GENASubscription arg0) {
 				Log.i(TAG, "Event: " + arg0.getCurrentSequence().getValue());
-				
+
 				try {
-					LastChange lastChange = new LastChange(new AVTransportLastChangeParser(), arg0.getCurrentValues().get("LastChange").toString());
+					LastChange lastChange = new LastChange(
+							new AVTransportLastChangeParser(), arg0
+									.getCurrentValues().get("LastChange")
+									.toString());
 					updateStatus(lastChange);
 				} catch (Exception e) {
 					e.printStackTrace();
 					Log.e(TAG, "Error parsing LastChange");
 				}
-				
+
 			}
-			
+
 			@Override
 			protected void established(GENASubscription arg0) {
-				Log.i(TAG, "Established: "+arg0.getSubscriptionId());
-				
+				Log.i(TAG, "Established: " + arg0.getSubscriptionId());
+
 			}
-			
+
 			@Override
 			protected void ended(GENASubscription arg0, CancelReason arg1,
 					UpnpResponse arg2) {
-								
+
 			}
-		};		
+		};
 	}
-	
+
 	private void updateStatus(LastChange lastChange) {
-		
+
 		// extract TrackMetaData
-		CurrentTrackMetaData currentTrack = lastChange.getEventedValue(0, AVTransportVariable.CurrentTrackMetaData.class);
-		if(null != currentTrack) {
+		CurrentTrackMetaData currentTrack = lastChange.getEventedValue(0,
+				AVTransportVariable.CurrentTrackMetaData.class);
+		if (null != currentTrack) {
 			DIDLParser dParser = new DIDLParser();
 			try {
-				Log.i(TAG,currentTrack.getValue());
+				Log.i(TAG, currentTrack.getValue());
 				DIDLContent dContent = dParser.parse(currentTrack.getValue());
 				List<Item> blubb = dContent.getItems();
 				MusicTrack mt = new MusicTrack(blubb.get(0));
 				mCurrentTrack = mt;
-				if(null != mt.getFirstArtist())
-					Log.i(TAG, "CurrentTrack: "+mt.getTitle()+" "+mt.getAlbum()+" "+mt.getFirstArtist().getName());
+				if (null != mt.getFirstArtist())
+					Log.i(TAG,
+							"CurrentTrack: " + mt.getTitle() + " "
+									+ mt.getAlbum() + " "
+									+ mt.getFirstArtist().getName());
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		// extract TransportState
-		AVTransportVariable.TransportState transportState = lastChange.getEventedValue(0, AVTransportVariable.TransportState.class);
-		if(null != transportState) {
-			Log.i(TAG, "TransportState: "+transportState.getValue().getValue());
+		AVTransportVariable.TransportState transportState = lastChange
+				.getEventedValue(0, AVTransportVariable.TransportState.class);
+		if (null != transportState) {
+			mCurrentTransportState = transportState.getValue();
+			Log.i(TAG, "TransportState: " + mCurrentTransportState.getValue());
 		}
-		
+
 		// extract duration of Track
-		AVTransportVariable.CurrentTrackDuration currentDuration = lastChange.getEventedValue(0, AVTransportVariable.CurrentTrackDuration.class);
-		if(null != currentDuration) {
+		AVTransportVariable.CurrentTrackDuration currentDuration = lastChange
+				.getEventedValue(0,
+						AVTransportVariable.CurrentTrackDuration.class);
+		if (null != currentDuration) {
 			try {
-				mCurrentDUration = new SimpleDateFormat("HH:mm:ss").parse(currentDuration.getValue());
-				Log.i(TAG, "CurrentDuration: "+new SimpleDateFormat("mm:ss").format(mCurrentDUration));
+				Date duration = new SimpleDateFormat("HH:mm:ss")
+						.parse(currentDuration.getValue());
+				if(!duration.equals(new SimpleDateFormat("mm:ss").parse("00:00")))
+					mCurrentDUration = new SimpleDateFormat("HH:mm:ss").parse(currentDuration.getValue());
+				Log.i(TAG,
+						"CurrentDuration: "
+								+ new SimpleDateFormat("mm:ss")
+										.format(mCurrentDUration));
 			} catch (ParseException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
-		updateView();
+
+		runOnUiThread(new Runnable() {
+
+			@Override
+			public void run() {
+				updateView();
+
+			}
+		});
 	}
 
 	/**
@@ -219,19 +252,38 @@ public class ControlActivity extends Activity {
 		}
 		return super.onOptionsItemSelected(item);
 	}
-	
+
+	// updates stuff on view
+	// needs to be called from UI-Thread
 	private void updateView() {
-		if(null != mCurrentTrack && null != mCurrentDUration) {
-			runOnUiThread(new Runnable() {
-				
-				@Override
-				public void run() {
-					mTitleText.setText(mCurrentTrack.getTitle()+" ("+new SimpleDateFormat("m:ss").format(mCurrentDUration)+")");
-					if(null != mCurrentTrack.getFirstArtist())
-						mArtistText.setText(mCurrentTrack.getFirstArtist().getName());
-					mAlbumText.setText(mCurrentTrack.getAlbum());					
-				}
-			});
+		if (null != mCurrentTrack && null != mCurrentDUration
+				&& null != mCurrentTrack.getFirstArtist()) {
+			mTitleText.setText(mCurrentTrack.getTitle() + " ("
+					+ new SimpleDateFormat("m:ss").format(mCurrentDUration)
+					+ ")");
+			mArtistText.setText(mCurrentTrack.getFirstArtist().getName());
+			mAlbumText.setText(mCurrentTrack.getAlbum());
+		}
+
+		if (null != mCurrentTransportState) {
+			switch (mCurrentTransportState) {
+			case PLAYING:
+				mPlayButton.setEnabled(true);
+				mPlayButton.setText("||");
+				mStopButton.setEnabled(true);
+				break;
+			case PAUSED_PLAYBACK:
+				mPlayButton.setEnabled(true);
+				mPlayButton.setText("Play");
+				mStopButton.setEnabled(true);
+				break;
+			case STOPPED:
+				mPlayButton.setEnabled(true);
+				mPlayButton.setText("Play");
+				mStopButton.setEnabled(false);
+				break;
+			default:
+			}
 		}
 	}
 
@@ -244,18 +296,38 @@ public class ControlActivity extends Activity {
 
 		if (mAVService != null) {
 
-			ActionCallback playAction = new Play(mAVService) {
+			if (mCurrentTransportState == null
+					|| mCurrentTransportState == TransportState.STOPPED
+					|| mCurrentTransportState == TransportState.PAUSED_PLAYBACK) {
+				ActionCallback playAction = new Play(mAVService) {
 
-				@Override
-				public void failure(ActionInvocation arg0, UpnpResponse arg1,
-						String arg2) {
-					if (BuildConfig.DEBUG)
-						Log.d(TAG, arg1.getResponseDetails());
+					@Override
+					public void failure(ActionInvocation arg0,
+							UpnpResponse arg1, String arg2) {
+						if (BuildConfig.DEBUG)
+							Log.d(TAG, arg1.getResponseDetails());
 
-				}
-			};
+					}
+				};
 
-			mUpnpService.getControlPoint().execute(playAction);
+				mUpnpService.getControlPoint().execute(playAction);
+			}
+
+			if (null != mCurrentTransportState
+					&& mCurrentTransportState == TransportState.PLAYING) {
+				ActionCallback playAction = new Pause(mAVService) {
+
+					@Override
+					public void failure(ActionInvocation arg0,
+							UpnpResponse arg1, String arg2) {
+						if (BuildConfig.DEBUG)
+							Log.d(TAG, arg1.getResponseDetails());
+
+					}
+				};
+
+				mUpnpService.getControlPoint().execute(playAction);
+			}
 		}
 	}
 
