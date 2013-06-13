@@ -7,10 +7,11 @@
     <uses-sdk
         android:minSdkVersion="14"
         android:targetSdkVersion="17" />
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
-    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"
@@ -26,7 +27,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name="org.teleal.cling.android.AndroidUpnpServiceImpl"></service>
+
+        <service android:name=".helper.MyUpnpServiceImpl" >
+        </service>
+
+        <activity
+            android:name="com.example.muc13_04_bachnigsch.DiscoveryActivity"
+            android:label="@string/title_activity_discovery"
+            android:parentActivityName="com.example.muc13_02_bachnigsch.MainActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.example.muc13_02_bachnigsch.MainActivity" />
+        </activity>
+        <activity
+            android:name="com.example.muc13_04_bachnigsch.ControlActivity"
+            android:label="@string/title_activity_control"
+            android:parentActivityName="com.example.muc13_04_bachnigsch.DiscoveryActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.example.muc13_04_bachnigsch.DiscoveryActivity" />
+        </activity>
     </application>
 
 </manifest>

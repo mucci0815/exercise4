@@ -4,5 +4,9 @@
     <string name="app_name">Exercise4</string>
     <string name="action_settings">Settings</string>
     <string name="hello_world">Hello world!</string>
+    <string name="title_activity_discovery">DiscoveryActivity</string>
+    <string name="title_activity_control">ControlActivity</string>
+    <string name="previous">&lt;&lt;</string>
+    <string name="next">&gt;&gt;</string>
 
 </resources>
