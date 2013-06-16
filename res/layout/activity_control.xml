@@ -8,26 +8,23 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".ControlActivity" >
 
+    <TextView
+        android:id="@+id/textView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:text="Remote Control"
+        android:textAppearance="?android:attr/textAppearanceLarge" />
+
     <Button
         android:id="@+id/playButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="44dp"
-        android:layout_marginTop="64dp"
+        android:layout_alignLeft="@+id/textView1"
+        android:layout_below="@+id/textView1"
         android:enabled="true"
         android:onClick="onPlay"
         android:text="Play" />
-
-    <Button
-        android:id="@+id/stopButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/playButton"
-        android:layout_alignBottom="@+id/playButton"
-        android:layout_centerHorizontal="true"
-        android:enabled="false"
-        android:onClick="onStop"
-        android:text="Stop" />
 
     <Button
         android:id="@+id/previousButton"
@@ -35,84 +32,117 @@
         android:layout_height="wrap_content"
         android:layout_alignLeft="@+id/playButton"
         android:layout_below="@+id/playButton"
-        android:layout_marginTop="14dp"
         android:onClick="onPrevious"
         android:text="@string/previous" />
+
+    <Button
+        android:id="@+id/minusButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/previousButton"
+        android:layout_below="@+id/previousButton"
+        android:onClick="onMinus"
+        android:text="-" />
+
+    <Button
+        android:id="@+id/plusButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/nextButton"
+        android:layout_toRightOf="@+id/previousButton"
+        android:onClick="onPlus"
+        android:text="+" />
+
+    <Button
+        android:id="@+id/muteButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/plusButton"
+        android:layout_alignBottom="@+id/plusButton"
+        android:layout_toRightOf="@+id/textView1"
+        android:onClick="onMute"
+        android:text="Mute" />
 
     <Button
         android:id="@+id/nextButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/previousButton"
-        android:layout_alignBottom="@+id/previousButton"
-        android:layout_alignLeft="@+id/stopButton"
+        android:layout_above="@+id/minusButton"
+        android:layout_alignLeft="@+id/plusButton"
         android:onClick="onNext"
         android:text="@string/next" />
 
-    <TextView
-        android:id="@+id/textView1"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/stopButton"
-        android:layout_marginBottom="22dp"
-        android:text="Remote Control"
-        android:textAppearance="?android:attr/textAppearanceLarge" />
-
     <Button
-        android:id="@+id/button2"
+        android:id="@+id/stopButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_above="@+id/nextButton"
         android:layout_alignLeft="@+id/nextButton"
-        android:layout_centerVertical="true"
-        android:onClick="onMinus"
-        android:text="-" />
+        android:enabled="false"
+        android:onClick="onStop"
+        android:text="Stop" />
 
-    <Button
-        android:id="@+id/button1"
+    <SeekBar
+        android:id="@+id/seekBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_alignParentLeft="true"
+        android:layout_centerVertical="true" />
+
+    <TextView
+        android:id="@+id/timeText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/button2"
-        android:layout_alignBottom="@+id/button2"
-        android:layout_alignLeft="@+id/titleText"
-        android:onClick="onPlus"
-        android:text="+" />
+        android:layout_alignRight="@+id/seekBar"
+        android:layout_below="@+id/seekBar"
+        android:layout_marginRight="17dp"
+        android:text="TimeText"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <TextView
+        android:id="@+id/volumeText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/albumText"
+        android:layout_below="@+id/albumText"
+        android:text="Volume"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <TextView
         android:id="@+id/albumText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/previousButton"
-        android:layout_below="@+id/button1"
-        android:layout_marginTop="62dp"
+        android:layout_alignLeft="@+id/titleText"
+        android:layout_below="@+id/titleText"
         android:text="Album"
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <TextView
-        android:id="@+id/titleText"
+        android:id="@+id/playingText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/previousButton"
-        android:layout_below="@+id/albumText"
-        android:text="Title"
+        android:layout_alignRight="@+id/plusButton"
+        android:layout_below="@+id/timeText"
+        android:text="Now playing:"
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <TextView
         android:id="@+id/artistText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/previousButton"
-        android:layout_below="@+id/titleText"
-        android:text="Atrist"
+        android:layout_alignLeft="@+id/playingText"
+        android:layout_below="@+id/playingText"
+        android:text="Artist"
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <TextView
-        android:id="@+id/volumeText"
+        android:id="@+id/titleText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignLeft="@+id/artistText"
         android:layout_below="@+id/artistText"
-        android:layout_marginTop="23dp"
-        android:text="Volume"
-        android:textAppearance="?android:attr/textAppearanceLarge" />
+        android:text="Title"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
 
 </RelativeLayout>
