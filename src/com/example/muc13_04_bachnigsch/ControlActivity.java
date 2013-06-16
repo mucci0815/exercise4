@@ -4,29 +4,25 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.teleal.cling.android.AndroidUpnpService;
 import org.teleal.cling.controlpoint.ActionCallback;
-import org.teleal.cling.model.ModelUtil;
-import org.teleal.cling.model.action.ActionException;
 import org.teleal.cling.controlpoint.SubscriptionCallback;
+import org.teleal.cling.model.ModelUtil;
 import org.teleal.cling.model.action.ActionInvocation;
 import org.teleal.cling.model.gena.CancelReason;
 import org.teleal.cling.model.gena.GENASubscription;
 import org.teleal.cling.model.message.UpnpResponse;
 import org.teleal.cling.model.meta.Device;
 import org.teleal.cling.model.meta.Service;
-import org.teleal.cling.model.types.ErrorCode;
 import org.teleal.cling.model.types.UDAServiceType;
 import org.teleal.cling.support.avtransport.callback.GetPositionInfo;
 import org.teleal.cling.support.avtransport.callback.Pause;
 import org.teleal.cling.support.avtransport.callback.Play;
 import org.teleal.cling.support.avtransport.callback.Seek;
 import org.teleal.cling.support.avtransport.callback.Stop;
-import org.teleal.cling.support.renderingcontrol.callback.GetMute;
-import org.teleal.cling.support.renderingcontrol.callback.GetVolume;
-import org.teleal.cling.support.renderingcontrol.callback.SetMute;
-import org.teleal.cling.support.renderingcontrol.callback.SetVolume;
 import org.teleal.cling.support.avtransport.lastchange.AVTransportLastChangeParser;
 import org.teleal.cling.support.avtransport.lastchange.AVTransportVariable;
 import org.teleal.cling.support.avtransport.lastchange.AVTransportVariable.CurrentTrackMetaData;
@@ -38,6 +34,10 @@ import org.teleal.cling.support.model.SeekMode;
 import org.teleal.cling.support.model.TransportState;
 import org.teleal.cling.support.model.item.Item;
 import org.teleal.cling.support.model.item.MusicTrack;
+import org.teleal.cling.support.renderingcontrol.callback.GetVolume;
+import org.teleal.cling.support.renderingcontrol.callback.SetMute;
+import org.teleal.cling.support.renderingcontrol.callback.SetVolume;
+
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
@@ -64,15 +64,41 @@ import com.example.muc13_04_bachnigsch.helper.MyUpnpServiceImpl;
 
 public class ControlActivity extends Activity implements OnSeekBarChangeListener {
 
+
+
+	@Override
+	protected void onPause() {
+		super.onPause();
+		
+		if (null != mTimer){
+				mTimerTask.cancel();
+				mTimer.cancel();
+				mTimer = null;
+		}		
+	}
+
+
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		
+		if (null == mTimer){
+			mTimer = new Timer();
+			mTimer.scheduleAtFixedRate(mTimerTask, 0, 1000);
+		}
+	}
+
 	public static final String TAG = ControlActivity.class.getName();
 	private Device mDevice = null;
 	private AndroidUpnpService mUpnpService;
 	private Service mAVService = null;
 	private Service rcService = null;
 	private int volume;
-	private boolean mute_state = true;
+	private boolean mute_state = false;
 	private Animation anim = new AlphaAnimation(0.0f, 1.0f);
 	private String absTime;
+	private int progress;
 	
 
 	private SubscriptionCallback mSubscriptionCallback;
@@ -88,7 +114,10 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 		@Override
 		public void onServiceConnected(ComponentName name, IBinder service) {
 			mUpnpService = (AndroidUpnpService) service; // get service binder
-
+			
+			// erstmaliges lautstaerke abfragen
+			getVolume();
+			
 			if (null != mSubscriptionCallback)
 				mUpnpService.getControlPoint().execute(mSubscriptionCallback);
 		}
@@ -105,8 +134,48 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 	private Button mMuteButton;
 	private SeekBar mSeekBar;
 	private MusicTrack mCurrentTrack = null; // holds current Track
-	private Date mCurrentDUration = null;
+	private Date mCurrentDuration = null;
 	private TransportState mCurrentTransportState = null;
+	
+	private Timer mTimer = null;
+	
+	
+	private TimerTask mTimerTask = new TimerTask(){
+
+		@Override
+		public void run() {
+			ActionCallback positionAction = new GetPositionInfo(mAVService) {
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());
+				}
+				@Override
+				public void received(ActionInvocation arg0, PositionInfo position) {
+					//System.out.println("Position: " + Integer.toString(position.getElapsedPercent()));
+					mSeekBar.setProgress(position.getElapsedPercent());	
+					absTime = position.getAbsTime();
+				}
+			};
+			
+			if(mUpnpService != null){
+				mUpnpService.getControlPoint().execute(positionAction);
+			}
+			
+			
+			
+			runOnUiThread(new Runnable() {
+
+				@Override
+				public void run() {
+					updateView();
+
+				}
+			});
+			
+		}
+		
+	};
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -140,8 +209,6 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 		getApplicationContext().bindService(
 				new Intent(this, MyUpnpServiceImpl.class), mServiceConnection,
 				Context.BIND_AUTO_CREATE);
-
-		// TODO: unbind service and take care of all that stuff
 
 		// get AVTransportService
 		mAVService = mDevice.findService(new UDAServiceType("AVTransport"));
@@ -196,9 +263,12 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 		};
 		
 		
-
 		
 	}
+	
+
+	
+	
 
 	private void updateStatus(LastChange lastChange) {
 
@@ -221,7 +291,6 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 				}
 				
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -232,6 +301,9 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 		if (null != transportState) {
 			mCurrentTransportState = transportState.getValue();
 			Log.i(TAG, "TransportState: " + mCurrentTransportState.getValue());
+			
+			
+			
 		}
 
 		// extract duration of Track
@@ -243,13 +315,12 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 				Date duration = new SimpleDateFormat("HH:mm:ss")
 						.parse(currentDuration.getValue());
 				if(!duration.equals(new SimpleDateFormat("mm:ss").parse("00:00")))
-					mCurrentDUration = new SimpleDateFormat("HH:mm:ss").parse(currentDuration.getValue());
+					mCurrentDuration = new SimpleDateFormat("HH:mm:ss").parse(currentDuration.getValue());
 				Log.i(TAG,
 						"CurrentDuration: "
 								+ new SimpleDateFormat("mm:ss")
-										.format(mCurrentDUration));
+										.format(mCurrentDuration));
 			} catch (ParseException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}	
 		}
@@ -300,16 +371,13 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 	// updates stuff on view
 	// needs to be called from UI-Thread
 	private void updateView() {
-		if (null != mCurrentTrack && null != mCurrentDUration && null != mCurrentTrack.getFirstArtist()) {
-			mTitleText.setText(mCurrentTrack.getTitle() + " ("+ new SimpleDateFormat("m:ss").format(mCurrentDUration)+ ")");
+		if (null != mCurrentTrack && null != mCurrentDuration && null != mCurrentTrack.getFirstArtist()) {
+			mTitleText.setText(mCurrentTrack.getTitle() + " ("+ new SimpleDateFormat("m:ss").format(mCurrentDuration)+ ")");
 			mArtistText.setText(mCurrentTrack.getFirstArtist().getName());
-			mAlbumText.setText(mCurrentTrack.getAlbum());
-			
+			mAlbumText.setText(mCurrentTrack.getAlbum());	
 		}
 
 		if (null != mCurrentTransportState) {
-				
-			
 			switch (mCurrentTransportState) {
 			case PLAYING:
 				mPlayButton.setEnabled(true);
@@ -326,16 +394,12 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 				mPlayButton.setEnabled(true);
 				mPlayButton.setText("Play");
 				mStopButton.setEnabled(true);
-				
 				mPlayingText.setText("Now paused: ");
-
 				blink(mPlayingText);
 				blink(mTitleText);
 				blink(mArtistText);
 				blink(mAlbumText);
 				blink(mVolumeText);
-				
-				
 				break;
 			case STOPPED:
 				mPlayButton.setEnabled(true);
@@ -346,6 +410,18 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 			}
 			
 		}
+		mTimeText.setText(absTime + " (" + Integer.toString(progress) + "%)");
+		mVolumeText.setText("Volume: " + volume);
+		
+		if(mute_state){
+			mMuteButton.setText("Unmute");
+			mVolumeText.setText("Volume: muted");
+		}
+		else if (!mute_state) {
+			mMuteButton.setText("Mute");
+			mVolumeText.setText("Volume: " + volume);
+		}
+		
 	}
 
 	/**
@@ -501,11 +577,19 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 						Log.d(TAG, arg1.getResponseDetails());	
 				}
 			};
-			System.out.println("Setze Lautstaerke auf: " + volume);
-			mVolumeText.setText("Volume: " + volume);
+		
+
 			mUpnpService.getControlPoint().execute(plusAction);
-			getVolume();
-			System.out.println("nach dem setzen von volume: " + volume);
+			
+			runOnUiThread(new Runnable() {
+
+				@Override
+				public void run() {
+					updateView();
+
+				}
+			});
+
 		}
 	}
 	
@@ -529,9 +613,17 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 						Log.d(TAG, arg1.getResponseDetails());	
 				}
 			};
-			System.out.println("Setze Lautstaerke auf: " + volume);
-			mVolumeText.setText("Volume: " + volume);
+			
 			mUpnpService.getControlPoint().execute(minusAction);
+			
+			runOnUiThread(new Runnable() {
+
+				@Override
+				public void run() {
+					updateView();
+
+				}
+			});
 		}
 	}
 	
@@ -543,21 +635,9 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 			Log.d(TAG, "Mute");
 		if (rcService != null) {
 
-			ActionCallback getMuteAction = new GetMute(rcService) {
-				
-				@Override
-				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
-					if (BuildConfig.DEBUG)
-						Log.d(TAG, arg1.getResponseDetails());		
-				}
-				
-				@Override
-				public void received(ActionInvocation arg0, boolean state) {
-					mute_state = state;	
-				}
-			};
+
 			
-			ActionCallback setMuteAction = new SetMute(rcService, mute_state) {
+			ActionCallback setMuteAction = new SetMute(rcService, !mute_state) {
 
 				@Override
 				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
@@ -567,17 +647,23 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 			};
 
 			mUpnpService.getControlPoint().execute(setMuteAction);
-						
+					
 			if(mute_state){
-				mMuteButton.setText("Unmute");
-				mVolumeText.setText("Volume: muted");
 				mute_state = false;
 			}
 			else if (!mute_state) {
-				mMuteButton.setText("Mute");
-				mVolumeText.setText("Volume: " + volume);
 				mute_state = true;
-			}	
+			}
+			
+			
+			runOnUiThread(new Runnable() {
+
+				@Override
+				public void run() {
+					updateView();
+
+				}
+			});
 		}
 	}
 
@@ -591,7 +677,7 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 	}
 	
 	public void unblink(TextView textView){
-		anim.cancel();
+		textView.clearAnimation();
 	}
 
 	
@@ -606,7 +692,7 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 	
 
 	@Override
-	public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+	public void onProgressChanged(SeekBar seekBar, final int progress_received, boolean fromUser) {
 		
 		ActionCallback positionAction = new GetPositionInfo(mAVService) {
 			@Override
@@ -623,12 +709,24 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 		};
 		mUpnpService.getControlPoint().execute(positionAction);
 		
-		mTimeText.setText(absTime + " (" + Integer.toString(progress) + "%)");
+		progress = progress_received;
+		
+		runOnUiThread(new Runnable() {
+
+			@Override
+			public void run() {
+				mTimeText.setText(absTime + " (" + Integer.toString(progress) + "%)");
+			}
+
+		
+		
+		});
+		
 	}
 
 	@Override
 	public void onStartTrackingTouch(SeekBar seekBar) {
-		// TODO Auto-generated method stub
+	
 		
 	}
 
@@ -636,7 +734,7 @@ public class ControlActivity extends Activity implements OnSeekBarChangeListener
 	public void onStopTrackingTouch(SeekBar seekBar) {
 		
 		int aimPosition = seekBar.getProgress();	
-		int durationTime = 60 * mCurrentDUration.getMinutes() + mCurrentDUration.getSeconds();
+		int durationTime = 60 * mCurrentDuration.getMinutes() + mCurrentDuration.getSeconds();
 		int jumpTime = durationTime * aimPosition / 100;
 		
 		
