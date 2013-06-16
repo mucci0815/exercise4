@@ -7,6 +7,8 @@ import java.util.List;
 
 import org.teleal.cling.android.AndroidUpnpService;
 import org.teleal.cling.controlpoint.ActionCallback;
+import org.teleal.cling.model.ModelUtil;
+import org.teleal.cling.model.action.ActionException;
 import org.teleal.cling.controlpoint.SubscriptionCallback;
 import org.teleal.cling.model.action.ActionInvocation;
 import org.teleal.cling.model.gena.CancelReason;
@@ -14,20 +16,28 @@ import org.teleal.cling.model.gena.GENASubscription;
 import org.teleal.cling.model.message.UpnpResponse;
 import org.teleal.cling.model.meta.Device;
 import org.teleal.cling.model.meta.Service;
+import org.teleal.cling.model.types.ErrorCode;
 import org.teleal.cling.model.types.UDAServiceType;
+import org.teleal.cling.support.avtransport.callback.GetPositionInfo;
 import org.teleal.cling.support.avtransport.callback.Pause;
 import org.teleal.cling.support.avtransport.callback.Play;
+import org.teleal.cling.support.avtransport.callback.Seek;
 import org.teleal.cling.support.avtransport.callback.Stop;
+import org.teleal.cling.support.renderingcontrol.callback.GetMute;
+import org.teleal.cling.support.renderingcontrol.callback.GetVolume;
+import org.teleal.cling.support.renderingcontrol.callback.SetMute;
+import org.teleal.cling.support.renderingcontrol.callback.SetVolume;
 import org.teleal.cling.support.avtransport.lastchange.AVTransportLastChangeParser;
 import org.teleal.cling.support.avtransport.lastchange.AVTransportVariable;
 import org.teleal.cling.support.avtransport.lastchange.AVTransportVariable.CurrentTrackMetaData;
 import org.teleal.cling.support.contentdirectory.DIDLParser;
 import org.teleal.cling.support.lastchange.LastChange;
 import org.teleal.cling.support.model.DIDLContent;
+import org.teleal.cling.support.model.PositionInfo;
+import org.teleal.cling.support.model.SeekMode;
 import org.teleal.cling.support.model.TransportState;
 import org.teleal.cling.support.model.item.Item;
 import org.teleal.cling.support.model.item.MusicTrack;
-
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
@@ -40,7 +50,11 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
 import android.widget.Button;
+import android.widget.SeekBar;
+import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 
 import com.example.muc13_04_bachnigsch.callback.Next;
@@ -48,19 +62,27 @@ import com.example.muc13_04_bachnigsch.callback.Previous;
 import com.example.muc13_04_bachnigsch.helper.AppData;
 import com.example.muc13_04_bachnigsch.helper.MyUpnpServiceImpl;
 
-public class ControlActivity extends Activity {
+public class ControlActivity extends Activity implements OnSeekBarChangeListener {
 
 	public static final String TAG = ControlActivity.class.getName();
 	private Device mDevice = null;
 	private AndroidUpnpService mUpnpService;
 	private Service mAVService = null;
-	private SubscriptionCallback mSubscriptionCallback;
-	private ServiceConnection mServiceConnection = new ServiceConnection() {
+	private Service rcService = null;
+	private int volume;
+	private boolean mute_state = true;
+	private Animation anim = new AlphaAnimation(0.0f, 1.0f);
+	private String absTime;
+	
 
+	private SubscriptionCallback mSubscriptionCallback;
+	//private SubscriptionCallback mSubscriptionCallback2;
+
+	private ServiceConnection mServiceConnection = new ServiceConnection() {
+	
 		@Override
 		public void onServiceDisconnected(ComponentName name) {
 			Log.e(TAG, "Service disconnected");
-
 		}
 
 		@Override
@@ -72,11 +94,16 @@ public class ControlActivity extends Activity {
 		}
 	};
 
+	private TextView mPlayingText;
 	private TextView mTitleText;
 	private TextView mArtistText;
 	private TextView mAlbumText;
+	private TextView mVolumeText;
+	private TextView mTimeText;
 	private Button mPlayButton;
 	private Button mStopButton;
+	private Button mMuteButton;
+	private SeekBar mSeekBar;
 	private MusicTrack mCurrentTrack = null; // holds current Track
 	private Date mCurrentDUration = null;
 	private TransportState mCurrentTransportState = null;
@@ -89,12 +116,20 @@ public class ControlActivity extends Activity {
 		setupActionBar();
 
 		// find TextViews
+		mPlayingText = (TextView) findViewById(R.id.playingText);
 		mTitleText = (TextView) findViewById(R.id.titleText);
 		mArtistText = (TextView) findViewById(R.id.artistText);
 		mAlbumText = (TextView) findViewById(R.id.albumText);
+		mVolumeText = (TextView) findViewById(R.id.volumeText);
+		mTimeText = (TextView) findViewById(R.id.timeText);
 		// find buttons
 		mPlayButton = (Button) findViewById(R.id.playButton);
 		mStopButton = (Button) findViewById(R.id.stopButton);
+		mMuteButton = (Button) findViewById(R.id.muteButton);
+		// find seekbar and set listener
+		mSeekBar = (SeekBar)findViewById(R.id.seekBar);
+		mSeekBar.setOnSeekBarChangeListener(this);
+		
 
 		// get selected device
 		mDevice = AppData.getInstance().getCurrentDevice();
@@ -110,7 +145,10 @@ public class ControlActivity extends Activity {
 
 		// get AVTransportService
 		mAVService = mDevice.findService(new UDAServiceType("AVTransport"));
+		// get RenderingControlService
+		rcService = mDevice.findService(new UDAServiceType("RenderingControl"));
 
+		
 		// listen for changes
 		mSubscriptionCallback = new SubscriptionCallback(mAVService, 600) {
 
@@ -130,7 +168,7 @@ public class ControlActivity extends Activity {
 			@Override
 			protected void eventReceived(GENASubscription arg0) {
 				Log.i(TAG, "Event: " + arg0.getCurrentSequence().getValue());
-
+								
 				try {
 					LastChange lastChange = new LastChange(
 							new AVTransportLastChangeParser(), arg0
@@ -156,6 +194,10 @@ public class ControlActivity extends Activity {
 
 			}
 		};
+		
+		
+
+		
 	}
 
 	private void updateStatus(LastChange lastChange) {
@@ -171,11 +213,13 @@ public class ControlActivity extends Activity {
 				List<Item> blubb = dContent.getItems();
 				MusicTrack mt = new MusicTrack(blubb.get(0));
 				mCurrentTrack = mt;
-				if (null != mt.getFirstArtist())
+				if (null != mt.getFirstArtist()){
 					Log.i(TAG,
 							"CurrentTrack: " + mt.getTitle() + " "
 									+ mt.getAlbum() + " "
 									+ mt.getFirstArtist().getName());
+				}
+				
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -207,7 +251,7 @@ public class ControlActivity extends Activity {
 			} catch (ParseException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
+			}	
 		}
 
 		runOnUiThread(new Runnable() {
@@ -256,34 +300,51 @@ public class ControlActivity extends Activity {
 	// updates stuff on view
 	// needs to be called from UI-Thread
 	private void updateView() {
-		if (null != mCurrentTrack && null != mCurrentDUration
-				&& null != mCurrentTrack.getFirstArtist()) {
-			mTitleText.setText(mCurrentTrack.getTitle() + " ("
-					+ new SimpleDateFormat("m:ss").format(mCurrentDUration)
-					+ ")");
+		if (null != mCurrentTrack && null != mCurrentDUration && null != mCurrentTrack.getFirstArtist()) {
+			mTitleText.setText(mCurrentTrack.getTitle() + " ("+ new SimpleDateFormat("m:ss").format(mCurrentDUration)+ ")");
 			mArtistText.setText(mCurrentTrack.getFirstArtist().getName());
 			mAlbumText.setText(mCurrentTrack.getAlbum());
+			
 		}
 
 		if (null != mCurrentTransportState) {
+				
+			
 			switch (mCurrentTransportState) {
 			case PLAYING:
 				mPlayButton.setEnabled(true);
 				mPlayButton.setText("||");
 				mStopButton.setEnabled(true);
+				mPlayingText.setText("Now playing: ");
+				unblink(mPlayingText);
+				unblink(mTitleText);
+				unblink(mArtistText);
+				unblink(mAlbumText);
+				unblink(mVolumeText);
 				break;
 			case PAUSED_PLAYBACK:
 				mPlayButton.setEnabled(true);
 				mPlayButton.setText("Play");
 				mStopButton.setEnabled(true);
+				
+				mPlayingText.setText("Now paused: ");
+
+				blink(mPlayingText);
+				blink(mTitleText);
+				blink(mArtistText);
+				blink(mAlbumText);
+				blink(mVolumeText);
+				
+				
 				break;
 			case STOPPED:
 				mPlayButton.setEnabled(true);
 				mPlayButton.setText("Play");
 				mStopButton.setEnabled(false);
 				break;
-			default:
+			default:			
 			}
+			
 		}
 	}
 
@@ -347,7 +408,6 @@ public class ControlActivity extends Activity {
 						String arg2) {
 					if (BuildConfig.DEBUG)
 						Log.d(TAG, arg1.getResponseDetails());
-
 				}
 			};
 
@@ -369,7 +429,6 @@ public class ControlActivity extends Activity {
 					String arg2) {
 				if (BuildConfig.DEBUG)
 					Log.d(TAG, arg1.getResponseDetails());
-
 			}
 		};
 
@@ -395,6 +454,206 @@ public class ControlActivity extends Activity {
 		};
 
 		mUpnpService.getControlPoint().execute(nextAction);
+	}
+	
+	
+
+	
+	
+	
+	public void getVolume(){
+		// Get Volume out of RenderingControlService
+		ActionCallback volumeAction = new GetVolume(rcService){
+			@Override
+			public void received(ActionInvocation actioonInvocation, int receivedVolume) {
+				System.out.println("GetVolume holt vom Service: " + receivedVolume);
+				volume = receivedVolume;
+			}
+
+			@Override
+			public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+				if (BuildConfig.DEBUG)
+					Log.d(TAG, arg1.getResponseDetails());	
+			}
+		};
+		
+		mUpnpService.getControlPoint().execute(volumeAction);
+	}
+	
+	
+	
+	/**
+	 * gets called when user presses "Plus" Button
+	 */
+	public void onPlus(View view) {
+		
+		if (BuildConfig.DEBUG)
+			Log.d(TAG, "Plus");
+		if (rcService != null) {
+
+			getVolume();
+			
+			volume +=5;
+			ActionCallback plusAction = new SetVolume(rcService, Long.valueOf(volume)) {
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());	
+				}
+			};
+			System.out.println("Setze Lautstaerke auf: " + volume);
+			mVolumeText.setText("Volume: " + volume);
+			mUpnpService.getControlPoint().execute(plusAction);
+			getVolume();
+			System.out.println("nach dem setzen von volume: " + volume);
+		}
+	}
+	
+
+	
+	
+	
+	public void onMinus(View view) {
+		
+		if (BuildConfig.DEBUG)
+			Log.d(TAG, "Minus");
+		if (rcService != null) {
+
+			getVolume();
+			
+			volume -=5;
+			ActionCallback minusAction = new SetVolume(rcService, Long.valueOf(volume)) {
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());	
+				}
+			};
+			System.out.println("Setze Lautstaerke auf: " + volume);
+			mVolumeText.setText("Volume: " + volume);
+			mUpnpService.getControlPoint().execute(minusAction);
+		}
+	}
+	
+	
+	
+	public void onMute(View view) {
+		
+		if (BuildConfig.DEBUG)
+			Log.d(TAG, "Mute");
+		if (rcService != null) {
+
+			ActionCallback getMuteAction = new GetMute(rcService) {
+				
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());		
+				}
+				
+				@Override
+				public void received(ActionInvocation arg0, boolean state) {
+					mute_state = state;	
+				}
+			};
+			
+			ActionCallback setMuteAction = new SetMute(rcService, mute_state) {
+
+				@Override
+				public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+					if (BuildConfig.DEBUG)
+						Log.d(TAG, arg1.getResponseDetails());		
+				}	
+			};
+
+			mUpnpService.getControlPoint().execute(setMuteAction);
+						
+			if(mute_state){
+				mMuteButton.setText("Unmute");
+				mVolumeText.setText("Volume: muted");
+				mute_state = false;
+			}
+			else if (!mute_state) {
+				mMuteButton.setText("Mute");
+				mVolumeText.setText("Volume: " + volume);
+				mute_state = true;
+			}	
+		}
+	}
+
+
+	public void blink(TextView textView){
+		anim.setDuration(500); //You can manage the time of the blink with this parameter
+		anim.setStartOffset(20);
+		anim.setRepeatMode(Animation.REVERSE);
+		anim.setRepeatCount(Animation.INFINITE);
+		textView.startAnimation(anim);
+	}
+	
+	public void unblink(TextView textView){
+		anim.cancel();
+	}
+
+	
+	
+	
+
+	
+	
+	/**
+	 *  SeekBar Stuff
+	 */
+	
+
+	@Override
+	public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+		
+		ActionCallback positionAction = new GetPositionInfo(mAVService) {
+			@Override
+			public void failure(ActionInvocation arg0, UpnpResponse arg1, String arg2) {
+				if (BuildConfig.DEBUG)
+					Log.d(TAG, arg1.getResponseDetails());
+			}
+			@Override
+			public void received(ActionInvocation arg0, PositionInfo position) {
+				//System.out.println("Position: " + Integer.toString(position.getElapsedPercent()));
+				mSeekBar.setProgress(position.getElapsedPercent());	
+				absTime = position.getAbsTime();
+			}
+		};
+		mUpnpService.getControlPoint().execute(positionAction);
+		
+		mTimeText.setText(absTime + " (" + Integer.toString(progress) + "%)");
+	}
+
+	@Override
+	public void onStartTrackingTouch(SeekBar seekBar) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void onStopTrackingTouch(SeekBar seekBar) {
+		
+		int aimPosition = seekBar.getProgress();	
+		int durationTime = 60 * mCurrentDUration.getMinutes() + mCurrentDUration.getSeconds();
+		int jumpTime = durationTime * aimPosition / 100;
+		
+		
+		// In benoetigtes Format umwandeln
+		String targetTime = ModelUtil.toTimeString(new Long(Math.round(jumpTime)).intValue());
+
+		ActionCallback seekAction = new Seek(mAVService, SeekMode.REL_TIME, targetTime) {
+
+			@Override
+			public void failure(ActionInvocation arg0, UpnpResponse arg1,
+					String arg2) {
+				if (BuildConfig.DEBUG)
+					Log.d(TAG, arg1.getResponseDetails());
+			}
+		};
+		mUpnpService.getControlPoint().execute(seekAction);
+		
 	}
 
 }
