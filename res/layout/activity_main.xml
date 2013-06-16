@@ -12,7 +12,10 @@
         android:id="@+id/textView1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/hello_world" />
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="43dp"
+        android:text="XBMC - RemoteControl - Enjoy" />
 
     <Button
         android:id="@+id/button1"
@@ -20,9 +23,8 @@
         android:layout_height="wrap_content"
         android:layout_alignLeft="@+id/textView1"
         android:layout_below="@+id/textView1"
-        android:layout_marginLeft="50dp"
-        android:layout_marginTop="82dp"
+        android:layout_marginTop="40dp"
         android:onClick="startDiscovery"
-        android:text="Discovery" />
+        android:text="Suche XBMC Server" />
 
 </RelativeLayout>
